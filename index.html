@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCM - Calculators & Sizers (Gemini AI)</title>
+    <style>
+        :root { font-size: 15px; --gold: #d4a373; --dark: #1a1a1a; --darker: #111; --card-bg: #2c2c2c; --text: #e0e0e0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--dark);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 40px 20px;
+            margin: 0;
+        }
+        .app-container { display: flex; flex-direction: column; align-items: center; gap: 30px; width: 100%; max-width: 1300px; }
+        
+        /* Header & Nav */
+        .header { width: 100%; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
+        .header-title-group { display: flex; align-items: center; gap: 20px; }
+        .header-logo { height: 140px; width: auto; mix-blend-mode: lighten; }
+        .main-title { color: var(--text); margin: 0; font-size: 2rem; }
+        .branding { color: var(--gold); }
+        .nav-group { display: flex; gap: 10px; }
+        .nav-link, .settings-btn {
+            background-color: var(--gold); color: var(--dark); padding: 10px 20px;
+            cursor: pointer; font-weight: 600; border: none; font-size: 1rem;
+            text-decoration: none; transition: all 0.2s; text-align: center; border-radius: 0;
+        }
+        .nav-link:hover, .settings-btn:hover { background-color: #b88a5a; transform: translateY(-1px); }
+
+        /* AI Controls */
+        .ocr-controls {
+            background-color: var(--card-bg); border: 1px solid #444; padding: 20px;
+            display: flex; justify-content: center; align-items: center; gap: 20px;
+            flex-wrap: wrap; width: 100%; border-radius: 0;
+        }
+        .ocr-controls label, .ocr-controls button, .control-button {
+            background-color: var(--gold); color: var(--dark); padding: 10px 20px;
+            cursor: pointer; font-weight: 600; border: none; font-size: 1rem;
+            transition: background-color 0.2s; border-radius: 0;
+        }
+        .ocr-controls label:hover, .ocr-controls button:hover, .control-button:hover { background-color: #b88a5a; }
+        #ocr-file-input { display: none; }
+        #ocr-status { color: #ffbf00; font-weight: 500; text-align: center; min-width: 350px; }
+        #reset-button { background-color: #666; color: #fff; }
+        #reset-button:hover { background-color: #555; }
+        
+        /* API Key Modal */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;
+        }
+        .modal {
+            background: var(--card-bg); padding: 30px; border: 1px solid var(--gold);
+            max-width: 500px; width: 90%; display: flex; flex-direction: column; gap: 15px;
+        }
+        .modal h3 { color: var(--gold); margin-top: 0; border: none; padding: 0; }
+        .modal input { background: #333; border: 1px solid #555; color: white; padding: 10px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+        /* Calculator Layout */
+        .calculators-wrapper { display: none; flex-direction: column; align-items: center; gap: 50px; width: 100%; }
+        .calculator-instance { width: 100%; max-width: 1200px; }
+        .calculator-instance.hidden { display: none; }
+        .main-wrapper { display: flex; justify-content: center; align-items: flex-start; gap: 30px; width: 100%; }
+        .calculator-container, .right-column { display: flex; flex-direction: column; gap: 30px; }
+        .calculator-container { max-width: 650px; width: 100%; flex-shrink: 0; }
+        .right-column { max-width: 400px; width: 100%; flex-shrink: 0; }
+        .card { background-color: var(--card-bg); padding: 25px 35px; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5); border: 1px solid #444; border-radius: 0; }
+        
+        /* Responsiveness */
+        @media (max-width: 1100px) { .main-wrapper { flex-direction: column; align-items: center; } .calculator-container, .right-column { width: 100%; max-width: 650px; flex-basis: auto; } }
+        
+        /* Typography & Elements */
+        h2 { text-align: center; color: var(--gold); margin:0 0 20px 0; font-weight: 600; font-size: 1.5rem; }
+        .section { margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 20px; }
+        .section:last-of-type { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+        h3 { color: var(--text); font-size: 1.1rem; margin:0 0 15px 0; border-left: 4px solid var(--gold); padding-left: 10px; }
+        .sub-section-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .sub-section h4 { margin: 0 0 10px 0; color: #b0b0b0; font-weight: 500; font-size: 0.9rem; }
+        
+        /* Form Controls */
+        .checkbox-label {
+            display: flex; justify-content: space-between; align-items: center;
+            background-color: #383838; padding: 8px 10px; margin-bottom: 8px;
+            cursor: pointer; transition: background-color 0.2s, border-color 0.2s;
+            border: 1px solid #555; font-weight: 500; font-size: 0.9rem; border-radius: 0;
+        }
+        .checkbox-label:hover { background-color: #454545; }
+        .checkbox-label input { margin-right: 8px; vertical-align: middle; }
+        .effect-label { font-size: 0.85rem; font-weight: 600; margin-left: 10px; flex-shrink: 0; }
+        .odds-enhancer .effect-label { color: #50c878; }
+        .odds-reducer .effect-label { color: #ffbf00; }
+        
+        /* Summary & Results */
+        .summary-section, .final-result-section { background-color: #222; padding: 15px; border-radius: 0; }
+        .summary-grid, .sizing-grid { display: grid; gap: 8px 15px; align-items: center; }
+        .summary-grid { grid-template-columns: 1fr auto; }
+        .sizing-grid { grid-template-columns: 1fr 1fr 1fr; }
+        .summary-label, .sizing-label, .sizer-label { font-weight: 500; color: #ccc; font-size: 0.9rem; }
+        .summary-value { font-weight: 700; font-size: 1rem; color: #fff; text-align: right; }
+        .final-result-display { text-align: center; }
+        .result-value { font-size: 2.2rem; font-weight: 700; color: #50c878; }
+        .result-title { font-size: 1rem; color: #ccc; display: block; margin-bottom: 5px; }
+        .result-message { font-size: 1rem; font-weight: 600; margin-top: 5px; }
+        .result-no-trade { color: #ff4d4d; }
+        .result-caution { color: #ffbf00; }
+        
+        /* Sizing Inputs */
+        .sizing-input, .sizer-input { width: 100%; padding: 6px; background-color: #333; border: 1px solid #555; color: #fff; font-size: 0.9rem; text-align: center; border-radius: 0; box-sizing: border-box; }
+        .sizing-output { font-weight: 700; font-size: 1.1rem; color: var(--gold); text-align: right; }
+        .sizer-form-grid { display: grid; grid-template-columns: 1fr; gap: 15px; }
+        .sizer-result-item { background-color: #383838; padding: 15px; text-align: center; margin-top: 10px; border-radius: 0; }
+        .position-value { font-size: 1.8rem; font-weight: 700; color: var(--gold); }
+        .enhancer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .input-with-button { display: flex; align-items: center; gap: 8px; }
+        .input-with-button .sizer-input { flex-grow: 1; }
+        .copy-button { padding: 5px 10px; font-size: 0.8rem; font-weight: 600; background-color: #555; color: #fff; border: 1px solid #666; cursor: pointer; transition: background-color 0.2s; border-radius: 0; }
+        .copy-button:hover { background-color: #6a6a6a; }
+        .copy-button.copied { background-color: #50c878; border-color: #48b36a; }
+        
+        /* Trade Log */
+        #log-trade-button { background-color: #50c878; margin-top: 15px; width: 100%; padding: 12px; font-size: 1.1rem; color:#fff; }
+        #log-trade-button:hover { background-color: #48b36a; }
+        #log-trade-button:disabled { background-color: #444; color: #888; cursor: not-allowed; }
+        .trade-log-container { display: flex; flex-direction: column; gap: 20px; }
+        .trade-log-controls { display: flex; gap: 15px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+        .trade-log-controls label { font-weight: 500; font-size: 0.9rem; }
+        .trade-log-controls select { background-color: #333; border: 1px solid #555; color: #fff; padding: 8px 12px; font-size: 0.9rem; border-radius: 0; }
+        #manual-entry-button { background-color: #50c878; color:#fff; }
+        #manual-entry-button:hover { background-color: #48b36a; }
+        #clear-log-button { background-color: #ff4d4d; color:#fff; }
+        #clear-log-button:hover { background-color: #e64545; }
+        .trade-log-table-wrapper { overflow-x: auto; }
+        .trade-log-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .trade-log-table th, .trade-log-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #444; white-space: nowrap; vertical-align: top; }
+        .trade-log-table th { background-color: #333; color: var(--gold); font-weight: 600; }
+        .trade-log-table td { background-color: #2c2c2c; }
+        .trade-log-table tr:hover td { background-color: #353535; }
+        .trade-log-table td[contenteditable="true"] { cursor: pointer; }
+        .trade-log-table td[contenteditable="true"]:focus-within { background-color: var(--gold); color: var(--dark); }
+        .trade-log-table th:nth-child(11), .trade-log-table td:nth-child(11) { white-space: normal; word-break: break-word; min-width: 250px; }
+        .action-cell { display: flex; gap: 8px; align-items: center; }
+        .calc-trade-button, .delete-trade-button { color: white; border: none; padding: 5px 8px; cursor: pointer; font-size: 0.8rem; border-radius: 0;}
+        .calc-trade-button { background-color: var(--gold); color: var(--dark); }
+        .calc-trade-button:hover { background-color: #b88a5a; }
+        .delete-trade-button { background-color: #e74c3c; }
+        .delete-trade-button:hover { background-color: #c0392b; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header">
+        <div class="header-title-group">
+            <img src="logo.png" alt="Logo" class="header-logo" onerror="this.style.display='none'">
+            <h1 class="main-title"><span class="branding">Trade Calculator</span> & Sizer</h1>
+        </div>
+        <div class="nav-group">
+            <button id="settings-btn" class="settings-btn">API Settings</button>
+            <a href="hp1.html" class="nav-link">Home</a>
+        </div>
+    </div>
+
+    <div class="ocr-controls">
+        <label for="ocr-file-input">1. Upload Screenshot (AI)</label>
+        <input type="file" id="ocr-file-input" accept="image/*">
+        <div id="ocr-status">Upload an image to start</div>
+        <button id="reset-button">Reset</button>
+    </div>
+
+    <!-- API Key Modal -->
+    <div id="api-modal" class="modal-overlay">
+        <div class="modal">
+            <h3>Google Gemini API Configuration</h3>
+            <p>This calculator uses Google Gemini to read your charts. The Key is stored locally in your browser.</p>
+            <label for="gemini-api-key">Enter Gemini API Key:</label>
+            <input type="password" id="gemini-api-key" placeholder="AIzaSy...">
+            <div style="font-size: 0.8rem; color: #888;">
+                Need a key? <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--gold);">Get one free from Google AI Studio</a>.
+            </div>
+            <div class="modal-actions">
+                <button class="control-button" id="close-modal">Cancel</button>
+                <button class="control-button" id="save-api-key" style="background-color: #50c878; color: white;">Save Key</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="calculators-wrapper">
+        <!-- 4H / Daily Calculator -->
+        <div id="h4-d-calculator" class="calculator-instance">
+            <div class="main-wrapper">
+                <div class="calculator-container card">
+                    <div>
+                        <h2>Sebastian Capital Management<br>'4 Hour / Daily' Trade Calculator</h2>
+                        <div class="section"><h3>Mandatory Technicals (All must be CHECKED)</h3><div class="sub-section-container"><div class="sub-section"><h4>DAILY</h4><label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Departure (Great)</label><label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Big Brother incl. 'looks like a zone'</label><label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Base (1-6C or WoW)</label><label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Original</label><label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Fresh</label></div><div class="sub-section"><h4>4 HOUR</h4><label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Departure (Great)</label>
+                            <label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Base (2-6C (higher on cross pairs / refer below)</label>
+                            <label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Original</label><label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Fresh</label></div></div></div>
+                        <div class="section"><h3>Odds Reducers (Reduces risk)</h3><div class="enhancer-grid" style="grid-template-columns: 1fr 1fr;">
+                            <label class="checkbox-label odds-reducer">
+                                <span><input type="checkbox" class="interactive-calc"> Counter-Trend</span>
+                                <span class="effect-label">x0.5 Risk</span>
+                            </label>
+                            <label class="checkbox-label odds-reducer">
+                                <span><input type="checkbox" class="interactive-calc"> Freshness (&lt;25% pen. & no past entry)</span>
+                                <span class="effect-label">x0.5 Risk</span>
+                            </label>
+                        </div></div>
+                        <div class="section"><h3>Odds Enhancers (Increases risk)</h3><div class="enhancer-grid" style="grid-template-columns: 1fr 1fr;">
+                            <label class="checkbox-label odds-enhancer">
+                                <span><input type="checkbox" class="interactive-calc" data-risk="0.50"> HTF Trend</span>
+                                <span class="effect-label">+0.50%</span>
+                            </label>
+                            <label class="checkbox-label odds-enhancer">
+                                <span><input type="checkbox" class="interactive-calc" data-risk="0.50"> Trap Zone</span>
+                                <span class="effect-label">+0.50%</span>
+                            </label>
+                            <label class="checkbox-label odds-enhancer">
+                                <span><input type="checkbox" class="interactive-calc" data-risk="0.25"> LTF LoL</span>
+                                <span class="effect-label">+0.25%</span>
+                            </label>
+                            <label class="checkbox-label odds-enhancer">
+                                <span><input type="checkbox" class="interactive-calc" data-risk="0.25"> LTF Flip Zone</span>
+                                <span class="effect-label">+0.25%</span>
+                            </label>
+                        </div></div>
+                        <div class="final-result-section"><div class="final-result-display"></div></div>
+                        <div class="summary-section" style="margin-top:20px;"><div class="summary-grid"><span class="summary-label">Initial Trade Size Risk</span><span class="summary-value summary-initial"></span><span class="summary-label">Odds Enhancer Bonus</span><span class="summary-value summary-enhancer"></span><span class="summary-label">Subtotal</span><span class="summary-value summary-subtotal"></span><span class="summary-label">Odds Reducer Penalty</span><span class="summary-value summary-reducer"></span><hr style="grid-column: 1 / -1; border-color: #444;"><span class="summary-label" style="font-weight: 700; font-size: 1.1em;">Total Adjusted Risk</span><span class="summary-value summary-total" style="font-weight: 700; font-size: 1.1em;"></span></div></div>
+                    </div>
+                </div>
+                <div class="right-column">
+                    <div class="card allocation-card"><h2>Risk Allocation</h2><div class="sizing-grid"><span class="sizing-label" style="font-weight:700;">Account</span><span class="sizing-label" style="font-weight:700; text-align:center;">Base Risk (for 1%)</span><span class="sizing-label" style="font-weight:700; text-align:right;">Calculated Risk</span><label class="sizing-label">IBKR</label><input type="number" class="sizing-input interactive-calc ibkr-base" value="2250"><span class="sizing-output ibkr-result"></span><label class="sizing-label">Campus Fund</label><input type="number" class="sizing-input interactive-calc campus-base" value="1000"><span class="sizing-output campus-result"></span><label class="sizing-label">Challenge Fund</label><input type="number" class="sizing-input interactive-calc challenge-base" value="2"><span class="sizing-output challenge-result"></span></div></div>
+                    <div class="card sizer-card"><h2>Position Sizer (IBKR)</h2><div class="sizer-form-grid"><div><label class="sizer-label">Currency Pair</label><select class="sizer-input interactive-calc currency-pair"></select></div>
+                        <div><label class="sizer-label">Entry Price</label><div class="input-with-button"><input type="number" step="any" class="sizer-input interactive-calc sizer-entry-price" placeholder="e.g., 1.0750"><button class="copy-button">Copy</button></div></div>
+                        <div><label class="sizer-label">Stop Loss</label><div class="input-with-button"><input type="number" step="any" class="sizer-input interactive-calc sizer-stop-loss" placeholder="e.g., 1.0700"><button class="copy-button">Copy</button></div></div>
+                    </div><div class="summary-section" style="padding:15px; margin-top:20px;"><div style="padding: 10px 0; text-align:center;"><span class="result-title" style="font-size:0.9em;">TRADE TYPE: <span class="trade-type" style="font-weight:700; color: #ffbf00;">--</span></span></div><div class="sizer-result-item"><span class="result-title">POSITION SIZE (UNITS - AUD RISK)</span><span class="position-value position-size-aud">--</span></div><div class="sizer-result-item"><span class="result-title">POSITION SIZE (UNITS - USD RISK)</span><span class="position-value position-size-usd">--</span></div></div></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Daily / Weekly Calculator -->
+        <div id="d-w-calculator" class="calculator-instance">
+            <div class="main-wrapper">
+                <div class="calculator-container card">
+                    <div>
+                        <h2>Sebastian Capital Management<br>'Daily / Weekly' Trade Calculator</h2>
+                        <div class="section"><h3>Mandatory Technicals (All must be CHECKED)</h3><div class="sub-section-container"><div class="sub-section"><h4>WEEKLY</h4><label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Departure (Great)</label><label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Big Brother incl. 'looks like a zone'</label><label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Base (1-6C or WoW)</label></div><div class="sub-section"><h4>DAILY</h4>
+                            <label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Departure (Great)</label>
+                            <label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Base (2-6C (higher on cross pairs / refer below)</label>
+                            <label class="checkbox-label"><input type="checkbox" class="mandatory-tech"> Original</label>
+                        </div></div></div>
+                        <div class="section"><h3>Odds Reducers (Reduces risk)</h3><div class="sub-section-container"><div class="sub-section"><h4>WEEKLY</h4>
+                            <label class="checkbox-label odds-reducer"><span><input type="checkbox" class="interactive-calc"> Counter-Trend</span><span class="effect-label">x0.5 Risk</span></label>
+                            <label class="checkbox-label odds-reducer"><span><input type="checkbox" class="interactive-calc"> Big Brother "looks like a zone"</span><span class="effect-label">x0.5 Risk</span></label>
+                            <label class="checkbox-label odds-reducer"><span><input type="checkbox" class="interactive-calc"> Originality</span><span class="effect-label">x0.5 Risk</span></label>
+                            <label class="checkbox-label odds-reducer"><span><input type="checkbox" class="interactive-calc"> Freshness</span><span class="effect-label">x0.5 Risk</span></label>
+                            <label class="checkbox-label odds-reducer" title="Retail Bullish / Bearish extreme counter trade"><span><input type="checkbox" class="interactive-calc"> Fundamentals</span><span class="effect-label">x0.5 Risk</span></label>
+                        </div><div class="sub-section"><h4>DAILY</h4>
+                            <label class="checkbox-label odds-reducer"><span><input type="checkbox" class="interactive-calc"> Base (7-10C)</span><span class="effect-label">x0.5 Risk</span></label>
+                            <label class="checkbox-label odds-reducer"><span><input type="checkbox" class="interactive-calc"> Freshness (&lt;25% pen. & no past entry)</span><span class="effect-label">x0.5 Risk</span></label>
+                        </div></div></div>
+                        <div class="section"><h3>Odds Enhancers (Increases risk)</h3><div class="enhancer-grid">
+                            <label class="checkbox-label odds-enhancer"><span><input type="checkbox" class="interactive-calc" data-risk="0.50"> HTF Trend</span><span class="effect-label">+0.50%</span></label>
+                            <label class="checkbox-label odds-enhancer"><span><input type="checkbox" class="interactive-calc" data-risk="0.25"> LTF LoL</span><span class="effect-label">+0.25%</span></label>
+                            <label class="checkbox-label odds-enhancer"><span><input type="checkbox" class="interactive-calc" data-risk="0.50"> Trap Zone</span><span class="effect-label">+0.50%</span></label>
+                            <label class="checkbox-label odds-enhancer"><span><input type="checkbox" class="interactive-calc" data-risk="0.25"> LTF Flip Zone</span><span class="effect-label">+0.25%</span></label>
+                            <label class="checkbox-label odds-enhancer"><span><input type="checkbox" class="interactive-calc" data-risk="0.25"> HTF FM Div</span><span class="effect-label">+0.25%</span></label>
+                            <label class="checkbox-label odds-enhancer" title="Opposite of the above"><span><input type="checkbox" class="interactive-calc" data-risk="0.25"> Fundamentals</span><span class="effect-label">+0.25%</span></label>
+                        </div></div>
+                        <div class="final-result-section"><div class="final-result-display"></div></div>
+                        <div class="summary-section" style="margin-top:20px;"><div class="summary-grid"><span class="summary-label">Initial Trade Size Risk</span><span class="summary-value summary-initial"></span><span class="summary-label">Odds Enhancer Bonus</span><span class="summary-value summary-enhancer"></span><span class="summary-label">Subtotal</span><span class="summary-value summary-subtotal"></span><span class="summary-label">Odds Reducer Penalty</span><span class="summary-value summary-reducer"></span><hr style="grid-column: 1 / -1; border-color: #444;"><span class="summary-label" style="font-weight: 700; font-size: 1.1em;">Total Adjusted Risk</span><span class="summary-value summary-total" style="font-weight: 700; font-size: 1.1em;"></span></div></div>
+                    </div>
+                </div>
+                <div class="right-column">
+                    <div class="card allocation-card"><h2>Risk Allocation</h2><div class="sizing-grid"><span class="sizing-label" style="font-weight:700;">Account</span><span class="sizing-label" style="font-weight:700; text-align:center;">Base Risk (for 1%)</span><span class="sizing-label" style="font-weight:700; text-align:right;">Calculated Risk</span><label class="sizing-label">IBKR</label><input type="number" class="sizing-input interactive-calc ibkr-base" value="2250"><span class="sizing-output ibkr-result"></span><label class="sizing-label">Campus Fund</label><input type="number" class="sizing-input interactive-calc campus-base" value="1000"><span class="sizing-output campus-result"></span><label class="sizing-label">Challenge Fund</label><input type="number" class="sizing-input interactive-calc challenge-base" value="2"><span class="sizing-output challenge-result"></span></div></div>
+                    <div class="card sizer-card"><h2>Position Sizer (IBKR)</h2><div class="sizer-form-grid"><div><label class="sizer-label">Currency Pair</label><select class="sizer-input interactive-calc currency-pair"></select></div>
+                        <div><label class="sizer-label">Entry Price</label><div class="input-with-button"><input type="number" step="any" class="sizer-input interactive-calc sizer-entry-price" placeholder="e.g., 1.0750"><button class="copy-button">Copy</button></div></div>
+                        <div><label class="sizer-label">Stop Loss</label><div class="input-with-button"><input type="number" step="any" class="sizer-input interactive-calc sizer-stop-loss" placeholder="e.g., 1.0700"><button class="copy-button">Copy</button></div></div>
+                    </div><div class="summary-section" style="padding:15px; margin-top:20px;"><div style="padding: 10px 0; text-align:center;"><span class="result-title" style="font-size:0.9em;">TRADE TYPE: <span class="trade-type" style="font-weight:700; color: #ffbf00;">--</span></span></div><div class="sizer-result-item"><span class="result-title">POSITION SIZE (UNITS - AUD RISK)</span><span class="position-value position-size-aud">--</span></div><div class="sizer-result-item"><span class="result-title">POSITION SIZE (UNITS - USD RISK)</span><span class="position-value position-size-usd">--</span></div></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="trade-log-section" class="card trade-log-container">
+        <h2>Trade Log</h2>
+        <div class="trade-log-controls">
+            <label for="sort-trades">Sort by:</label>
+            <select id="sort-trades" class="control-button">
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+            </select>
+            <button id="manual-entry-button" class="control-button">Manual Entry</button>
+            <button id="export-csv-button" class="control-button">Export to CSV</button>
+            <button id="clear-log-button" class="control-button">Clear All</button>
+        </div>
+        <div class="trade-log-table-wrapper">
+            <table class="trade-log-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Pair</th>
+                        <th>Entry</th>
+                        <th>Stop</th>
+                        <th>Risk (R)</th>
+                        <th>Risk $</th>
+                        <th>TP 1</th>
+                        <th>TP 2</th>
+                        <th>P&L (R)</th>
+                        <th>Notes</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="trade-log-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // --- Global Shared Data ---
+    let exchangeRates = null;
+    let calculatorH4D, calculatorDW;
+    const currencyPairs = ["AUDCAD", "AUDCHF", "AUDJPY", "AUDNZD", "AUDUSD", "CADCHF", "CADJPY", "CHFJPY", "EURAUD", "EURCAD", "EURCHF", "EURGBP", "EURJPY", "EURNOK", "EURNZD", "EURUSD", "GBPAUD", "GBPCAD", "GBPCHF", "GBPJPY", "GBPNZD", "GBPUSD", "NZDCAD", "NZDCHF", "NZDJPY", "NZDUSD", "USDCAD", "USDCHF", "USDJPY", "USDMXN", "USDNOK", "USDSEK", "USDZAR"];
+    currencyPairs.sort();
+
+    // --- Calculator Class ---
+    class TradeCalculator {
+        constructor(containerId) {
+            this.container = document.querySelector(containerId); 
+            if (!this.container) return; 
+            this.id = containerId;
+            this.bindDOMElements(); 
+            this.setupEventListeners(); 
+            this.populateCurrencyPairs(); 
+            this.performCalculations(); 
+        }
+        bindDOMElements() { this.allInteractiveElements = this.container.querySelectorAll('.interactive-calc, .mandatory-tech'); this.currencyPairEl = this.container.querySelector('.currency-pair'); this.ibkrResultEl = this.container.querySelector('.ibkr-result'); this.ibkrBaseEl = this.container.querySelector('.ibkr-base'); this.campusResultEl = this.container.querySelector('.campus-result'); this.campusBaseEl = this.container.querySelector('.campus-base'); this.challengeResultEl = this.container.querySelector('.challenge-result'); this.challengeBaseEl = this.container.querySelector('.challenge-base'); this.sizerEntryPriceEl = this.container.querySelector('.sizer-entry-price'); this.sizerStopLossEl = this.container.querySelector('.sizer-stop-loss'); this.tradeTypeEl = this.container.querySelector('.trade-type'); this.positionSizeValueAudEl = this.container.querySelector('.position-size-aud'); this.positionSizeValueUsdEl = this.container.querySelector('.position-size-usd'); this.finalResultSectionEl = this.container.querySelector('.final-result-section'); this.summarySectionEl = this.container.querySelector('.summary-section'); this.rightColumnEl = this.container.querySelector('.right-column'); this.finalResultDisplay = this.container.querySelector('.final-result-display'); this.summaryInitialEl = this.container.querySelector('.summary-initial'); this.summaryEnhancerEl = this.container.querySelector('.summary-enhancer'); this.summarySubtotalEl = this.container.querySelector('.summary-subtotal'); this.summaryReducerEl = this.container.querySelector('.summary-reducer'); this.summaryTotalEl = this.container.querySelector('.summary-total'); }
+        setupEventListeners() { this.allInteractiveElements.forEach(element => { element.addEventListener('change', () => this.performCalculations()); element.addEventListener('input', () => this.performCalculations()); }); }
+        populateCurrencyPairs() { this.currencyPairEl.innerHTML = ''; currencyPairs.forEach(pair => { const option = document.createElement('option'); option.value = pair; option.textContent = pair; this.currencyPairEl.appendChild(option); }); }
+        performCalculations() { 
+            const mandatoryPass = Array.from(this.container.querySelectorAll('.mandatory-tech')).every(cb => cb.checked); 
+            if (!mandatoryPass) { this.displayFailure("Failed Mandatory Technicals - DO NOT TRADE"); return; } 
+            
+            const reducerCount = this.container.querySelectorAll('.odds-reducer input:checked').length; 
+            if (reducerCount >= 3) { this.displayFailure("DO NOT TRADE - Too many odds reducers present"); return; } 
+            
+            this.showCalculationPanels(); 
+            const cautionMessage = reducerCount === 2 ? "Caution - 2 odds reducers identified" : ''; 
+            
+            let initialRisk = 1.00; 
+            if (this.id === '#h4-d-calculator') {
+                initialRisk = 0.75;
+            }
+            
+            let enhancerRisk = 0; 
+            this.container.querySelectorAll('.odds-enhancer input:checked').forEach(cb => { enhancerRisk += parseFloat(cb.dataset.risk); }); 
+            
+            const subtotalRisk = initialRisk + enhancerRisk; 
+            let finalRisk = reducerCount > 0 ? subtotalRisk / 2 : subtotalRisk; 
+            if (finalRisk > 2.00) finalRisk = 2.00; 
+            
+            this.updateRiskPanels(finalRisk, cautionMessage, {initialRisk, enhancerRisk, subtotalRisk, reducerCount}); 
+            this.calculateAllPositionSizes(); 
+        }
+        getPositionSize(riskAmount, riskCurrency, pair, entry, stop) { if (!exchangeRates || !riskAmount || riskAmount <= 0 || !pair || entry <= 0 || stop <= 0) return null; const stopDistance = Math.abs(entry - stop); if (stopDistance === 0) return null; const quoteCurrency = pair.substring(3, 6); const lotSize = 100000; const riskInQuoteCurrencyForLot = stopDistance * lotSize; const quoteToRiskRate = exchangeRates[riskCurrency] / exchangeRates[quoteCurrency]; if (!quoteToRiskRate) return null; const riskInAccountCurrencyForLot = riskInQuoteCurrencyForLot * quoteToRiskRate; if (riskInAccountCurrencyForLot <= 0) return null; const lotsToTrade = riskAmount / riskInAccountCurrencyForLot; return lotsToTrade * lotSize; }
+        calculateAllPositionSizes() { if (!exchangeRates) return; const riskAmountUSD = parseFloat(this.ibkrResultEl.textContent.replace('$', '')) || 0; const totalRiskPercent = parseFloat(this.summaryTotalEl.textContent) / 100 || 0; const baseRiskAUD = parseFloat(this.ibkrBaseEl.value) || 0; const riskAmountAUD = baseRiskAUD * totalRiskPercent; const entry = parseFloat(this.sizerEntryPriceEl.value) || 0; const stop = parseFloat(this.sizerStopLossEl.value) || 0; const pair = this.currencyPairEl.value; if (entry === 0 || stop === 0 || !pair) { this.tradeTypeEl.textContent = '--'; this.positionSizeValueAudEl.textContent = '--'; this.positionSizeValueUsdEl.textContent = '--'; return; } this.tradeTypeEl.textContent = entry > stop ? "Long" : "Short"; const unitsFormatter = new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); const positionSizeAUD = this.getPositionSize(riskAmountAUD, 'AUD', pair, entry, stop); const positionSizeUSD = this.getPositionSize(riskAmountUSD, 'USD', pair, entry, stop); this.positionSizeValueAudEl.textContent = positionSizeAUD ? unitsFormatter.format(positionSizeAUD * 100) : '--'; this.positionSizeValueUsdEl.textContent = positionSizeUSD ? unitsFormatter.format(positionSizeUSD) : '--'; }
+        updateRiskPanels(finalRisk, cautionMessage, data) { 
+            let messageHtml = cautionMessage ? `<div class="result-message result-caution">${cautionMessage}</div>` : ''; 
+            this.finalResultDisplay.innerHTML = `
+                <span class="result-title">FINAL ADJUSTED RISK</span>
+                <div class="result-value">${finalRisk.toFixed(2)}%</div>
+                ${messageHtml}
+                <button id="log-trade-button" class="control-button">Log Trade</button>`;
+            const logBtn = this.container.querySelector('#log-trade-button');
+            if(logBtn) logBtn.addEventListener('click', () => logTrade(this.id));
+            
+            this.summaryInitialEl.textContent = `${data.initialRisk.toFixed(2)}%`; this.summaryEnhancerEl.textContent = `+${data.enhancerRisk.toFixed(2)}%`; this.summarySubtotalEl.textContent = `${data.subtotalRisk.toFixed(2)}%`; this.summaryReducerEl.textContent = data.reducerCount > 0 ? `x 0.5 (${(data.subtotalRisk / 2).toFixed(2)}%)` : 'N/A'; this.summaryTotalEl.textContent = `${finalRisk.toFixed(2)}%`; const riskMultiplier = finalRisk / 1.00; const ibkrBase = parseFloat(this.ibkrBaseEl.value) || 0; const campusBase = parseFloat(this.campusBaseEl.value) || 0; const challengeBase = parseFloat(this.challengeBaseEl.value) || 0; this.ibkrResultEl.textContent = `$${(ibkrBase * riskMultiplier).toFixed(2)}`; this.campusResultEl.textContent = `$${(campusBase * riskMultiplier).toFixed(2)}`; this.challengeResultEl.textContent = `${(challengeBase * riskMultiplier).toFixed(2)}%`; 
+        }
+        displayFailure(message) {
+            this.finalResultSectionEl.innerHTML = `<span class="result-title">TRADE REJECTED</span><div class="result-message result-no-trade">${message}</div>`;
+            this.summarySectionEl.style.display = 'none';
+            this.rightColumnEl.style.display = 'flex'; 
+            this.ibkrResultEl.textContent = '$0.00';
+            this.campusResultEl.textContent = '$0.00';
+            this.challengeResultEl.textContent = '0.00%';
+            this.positionSizeValueAudEl.textContent = '--';
+            this.positionSizeValueUsdEl.textContent = '--';
+            this.tradeTypeEl.textContent = '--';
+        }
+        showCalculationPanels() { 
+            this.finalResultSectionEl.innerHTML = '<div class="final-result-display"></div>'; 
+            this.finalResultDisplay = this.container.querySelector('.final-result-display'); 
+            this.summarySectionEl.style.display = 'block'; 
+            this.rightColumnEl.style.display = 'flex'; 
+        }
+    }
+    
+    // --- Google Gemini Integration ---
+    const GEMINI_STORAGE_KEY = 'scm_gemini_api_key';
+    const ocrStatus = document.getElementById('ocr-status');
+
+    // API Key UI Logic
+    const settingsBtn = document.getElementById('settings-btn');
+    const apiModal = document.getElementById('api-modal');
+    const closeModal = document.getElementById('close-modal');
+    const saveApiKeyBtn = document.getElementById('save-api-key');
+    const apiKeyInput = document.getElementById('gemini-api-key');
+
+    settingsBtn.addEventListener('click', () => {
+        apiKeyInput.value = localStorage.getItem(GEMINI_STORAGE_KEY) || '';
+        apiModal.style.display = 'flex';
+    });
+
+    closeModal.addEventListener('click', () => {
+        apiModal.style.display = 'none';
+    });
+
+    saveApiKeyBtn.addEventListener('click', () => {
+        const key = apiKeyInput.value.trim();
+        if (key) {
+            localStorage.setItem(GEMINI_STORAGE_KEY, key);
+            apiModal.style.display = 'none';
+            alert('API Key Saved!');
+        } else {
+            alert('Please enter a valid key.');
+        }
+    });
+
+    // Helper: Convert File to Base64 (strip prefix for API)
+    function fileToGenerativePart(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64String = reader.result
+                    .replace('data:', '')
+                    .replace(/^.+,/, '');
+                resolve(base64String);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Main Gemini Vision Function
+    async function processImage(file) {
+        const apiKey = localStorage.getItem(GEMINI_STORAGE_KEY);
+        if (!apiKey) {
+            ocrStatus.innerHTML = '<strong style="color:#ff4d4d">Error: No API Key found. Click "Settings" to add one.</strong>';
+            return;
+        }
+
+        if (!file) return;
+
+        try {
+            document.querySelector('.calculators-wrapper').style.display = 'flex';
+            ocrStatus.textContent = 'Preparing image for Gemini AI...';
+            
+            const imageBase64 = await fileToGenerativePart(file);
+            
+            ocrStatus.textContent = 'Sending to Google AI...';
+
+            const prompt = `
+            Analyze this trading chart image. Return a JSON object (and nothing else) with these fields:
+            - pair: The 6-letter currency pair (e.g., AUDUSD, EURJPY). Look at corners or watermarks.
+            - timeframe: The timeframe (e.g., '4h', 'Daily', 'Weekly').
+            - entry: The numerical entry price.
+            - stop: The numerical stop loss price.
+            
+            Ensure 'pair' is one of these: ${currencyPairs.join(', ')}.
+            `;
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: prompt },
+                            { inline_data: { mime_type: file.type, data: imageBase64 } }
+                        ]
+                    }]
+                })
+            });
+
+            if (!response.ok) throw new Error('Gemini API request failed');
+
+            const data = await response.json();
+            const textResponse = data.candidates[0].content.parts[0].text;
+            
+            // Clean JSON (remove markdown backticks if present)
+            const jsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+            const result = JSON.parse(jsonString);
+
+            applyAiResults(result);
+
+        } catch (error) {
+            console.error("AI Error:", error);
+            ocrStatus.innerHTML = `<strong style="color:#ff4d4d">AI Error: ${error.message}</strong>`;
+        }
+    }
+
+    function applyAiResults(data) {
+        let statusParts = [];
+        let activeCalc = null;
+
+        // 1. Determine Timeframe & Activate Calculator
+        const tf = data.timeframe ? data.timeframe.toLowerCase() : '';
+        const isDailyWeekly = tf.includes('daily') || tf.includes('week') || tf.includes('1d') || tf.includes('1w');
+        
+        // Hide both, then show relevant
+        const calcH4D_El = document.getElementById('h4-d-calculator');
+        const calcDW_El = document.getElementById('d-w-calculator');
+        
+        if (isDailyWeekly) {
+            calcH4D_El.classList.add('hidden');
+            calcDW_El.classList.remove('hidden');
+            activeCalc = calculatorDW;
+            statusParts.push(`Timeframe: <strong style="color: #50c878;">Daily/Weekly</strong>`);
+        } else {
+            // Default to 4H/Daily
+            calcDW_El.classList.add('hidden');
+            calcH4D_El.classList.remove('hidden');
+            activeCalc = calculatorH4D;
+            statusParts.push(`Timeframe: <strong style="color: #50c878;">4H/Daily</strong>`);
+        }
+
+        // 2. Set Pair
+        if (data.pair && currencyPairs.includes(data.pair.toUpperCase())) {
+            activeCalc.currencyPairEl.value = data.pair.toUpperCase();
+            statusParts.push(`Pair: <strong style="color: #50c878;">${data.pair.toUpperCase()}</strong>`);
+        } else {
+            statusParts.push(`Pair: <strong style="color: #ffbf00;">Unknown</strong>`);
+        }
+
+        // 3. Set Prices
+        if (data.entry) {
+            activeCalc.sizerEntryPriceEl.value = data.entry;
+            statusParts.push(`Entry: <strong style="color: #50c878;">${data.entry}</strong>`);
+        }
+        if (data.stop) {
+            activeCalc.sizerStopLossEl.value = data.stop;
+            statusParts.push(`Stop: <strong style="color: #50c878;">${data.stop}</strong>`);
+        }
+
+        ocrStatus.innerHTML = statusParts.join(' | ');
+        activeCalc.performCalculations();
+    }
+
+    // --- Standard App Logic ---
+    const ocrFileInput = document.getElementById('ocr-file-input');
+    const resetButton = document.getElementById('reset-button');
+    const calcH4D_El = document.getElementById('h4-d-calculator');
+    const calcDW_El = document.getElementById('d-w-calculator');
+
+    function resetApp() {
+        ocrFileInput.value = '';
+        ocrStatus.innerHTML = 'Upload an image to start';
+        ocrStatus.style.color = '#ffbf00';
+        document.querySelector('.calculators-wrapper').style.display = 'none';
+        calcH4D_El.classList.remove('hidden');
+        calcDW_El.classList.remove('hidden');
+        if (calculatorH4D) {
+            calculatorH4D.sizerEntryPriceEl.value = '';
+            calculatorH4D.sizerStopLossEl.value = '';
+            calculatorH4D.container.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            calculatorH4D.performCalculations();
+        }
+        if (calculatorDW) {
+            calculatorDW.sizerEntryPriceEl.value = '';
+            calculatorDW.sizerStopLossEl.value = '';
+            calculatorDW.container.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            calculatorDW.performCalculations();
+        }
+    }
+    
+    function setupCopyButtons() {
+        document.querySelectorAll('.copy-button').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const wrapper = event.target.closest('.input-with-button');
+                const input = wrapper.querySelector('.sizer-input');
+                if (input.value && navigator.clipboard) {
+                    navigator.clipboard.writeText(input.value).then(() => {
+                        const originalText = button.textContent;
+                        button.textContent = 'Copied!';
+                        button.classList.add('copied');
+                        setTimeout(() => {
+                            button.textContent = originalText;
+                            button.classList.remove('copied');
+                        }, 1500);
+                    });
+                }
+            });
+        });
+    }
+
+    const TRADE_LOG_KEY = 'scmTradeLog';
+    function getTrades() { return JSON.parse(localStorage.getItem(TRADE_LOG_KEY)) || []; }
+    function saveTrades(trades) { localStorage.setItem(TRADE_LOG_KEY, JSON.stringify(trades)); }
+
+    function logTrade(calculatorId) {
+        const calc = calculatorId === '#h4-d-calculator' ? calculatorH4D : calculatorDW;
+        if (!calc) return;
+        const entry = calc.sizerEntryPriceEl.value;
+        const stop = calc.sizerStopLossEl.value;
+        if (!entry || !stop) { alert("Please ensure Entry Price and Stop Loss are filled before logging."); return; }
+        const newTrade = {
+            id: Date.now(),
+            logDate: new Date().toISOString(),
+            calculatorType: calculatorId === '#h4-d-calculator' ? '4H/D' : 'D/W',
+            currencyPair: calc.currencyPairEl.value,
+            entryPrice: entry,
+            stopLoss: stop,
+            riskR: parseFloat(calc.summaryTotalEl.textContent) || 0,
+            riskAmountUSD: calc.ibkrResultEl.textContent,
+            tp1: '', tp2: '', pnl: '', notes: ''
+        };
+        const trades = getTrades();
+        trades.push(newTrade); 
+        saveTrades(trades);
+        sortAndRender();
+    }
+    
+    function manualLogTrade() {
+        const trades = getTrades();
+        trades.push({
+            id: Date.now(),
+            logDate: new Date().toISOString(),
+            calculatorType: 'Manual',
+            currencyPair: '', entryPrice: '', stopLoss: '', riskR: '',
+            riskAmountUSD: '', tp1: '', tp2: '', pnl: '', notes: ''
+        });
+        saveTrades(trades);
+        sortAndRender();
+    }
+    
+    function sortAndRender() {
+        const sortOrder = document.getElementById('sort-trades').value;
+        let trades = getTrades();
+        trades.sort((a, b) => {
+            const dateA = new Date(a.logDate);
+            const dateB = new Date(b.logDate);
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+        renderTradeLog(trades);
+    }
+
+    function renderTradeLog(trades) {
+        const tradeLogSection = document.getElementById('trade-log-section');
+        const tableBody = document.getElementById('trade-log-body');
+        tableBody.innerHTML = '';
+        if (trades.length === 0) { tradeLogSection.style.display = 'none'; return; }
+        
+        tradeLogSection.style.display = 'flex';
+        trades.forEach(trade => {
+            const row = tableBody.insertRow();
+            row.dataset.id = trade.id;
+            // Fields order: Date, Type, Pair, Entry, Stop, Risk(R), Risk$, TP1, TP2, PnL, Notes, Action
+            const fields = ['logDate', 'calculatorType', 'currencyPair', 'entryPrice', 'stopLoss', 'riskR', 'riskAmountUSD', 'tp1', 'tp2', 'pnl', 'notes'];
+            
+            fields.forEach(field => {
+                const cell = row.insertCell();
+                if(field === 'logDate') cell.textContent = new Date(trade[field]).toLocaleDateString();
+                else cell.textContent = trade[field];
+                cell.setAttribute('contenteditable', true);
+                cell.dataset.field = field;
+            });
+
+            const actionCell = row.insertCell();
+            actionCell.className = 'action-cell';
+            const calcBtn = document.createElement('button'); calcBtn.textContent = 'Calc'; calcBtn.className = 'calc-trade-button';
+            calcBtn.onclick = () => calculatePnl(trade.id);
+            const delBtn = document.createElement('button'); delBtn.textContent = 'Delete'; delBtn.className = 'delete-trade-button';
+            delBtn.onclick = () => deleteTrade(trade.id);
+            actionCell.append(calcBtn, delBtn);
+        });
+        addEditableCellListeners();
+    }
+    
+    function calculatePnl(id) {
+        const trades = getTrades();
+        const tradeIndex = trades.findIndex(t => t.id === id);
+        if (tradeIndex === -1) return;
+        const trade = trades[tradeIndex];
+        const entry = parseFloat(trade.entryPrice);
+        const stop = parseFloat(trade.stopLoss);
+        const tp1 = parseFloat(trade.tp1);
+        const tp2 = parseFloat(trade.tp2);
+        if (isNaN(entry) || isNaN(stop)) { alert("Cannot calculate P&L without a valid Entry and Stop price."); return; }
+        const riskDistance = Math.abs(entry - stop);
+        if (riskDistance === 0) return;
+        const isLong = entry > stop; 
+        const calcR = (exit) => isNaN(exit) ? 0 : (isLong ? exit - entry : entry - exit) / riskDistance;
+        let totalPnl = 0;
+        const hasTp1 = !isNaN(tp1) && trade.tp1.toString().trim() !== '';
+        const hasTp2 = !isNaN(tp2) && trade.tp2.toString().trim() !== '';
+        if (!hasTp1 && !hasTp2) totalPnl = -1.0;
+        else if (hasTp1 && hasTp2) totalPnl = (calcR(tp1) * 0.5) + (calcR(tp2) * 0.5);
+        else if (hasTp1) totalPnl = calcR(tp1);
+        else if (hasTp2) totalPnl = calcR(tp2);
+        
+        trades[tradeIndex].pnl = totalPnl.toFixed(2);
+        saveTrades(trades);
+        sortAndRender();
+    }
+
+    function addEditableCellListeners() {
+        document.querySelectorAll('#trade-log-body td[contenteditable="true"]').forEach(cell => {
+            cell.addEventListener('blur', (e) => {
+                const id = parseInt(e.target.closest('tr').dataset.id, 10);
+                const field = e.target.dataset.field;
+                let newValue = e.target.textContent;
+                if(field === 'logDate') {
+                    const d = new Date(newValue);
+                    if(!isNaN(d)) newValue = d.toISOString();
+                    else newValue = getTrades().find(t=>t.id===id).logDate;
+                }
+                const trades = getTrades();
+                const idx = trades.findIndex(t => t.id === id);
+                if (idx > -1) { trades[idx][field] = newValue; saveTrades(trades); }
+            });
+        });
+    }
+    
+    function deleteTrade(id) { if (confirm('Delete this trade?')) { saveTrades(getTrades().filter(t => t.id !== id)); sortAndRender(); } }
+    
+    function exportToCsv() {
+        const trades = getTrades();
+        if (!trades.length) { alert('No trades.'); return; }
+        const headers = Object.keys(trades[0]);
+        const rows = [headers.join(',')];
+        trades.forEach(t => rows.push(headers.map(h => `"${('' + t[h]).replace(/"/g, '""')}"`).join(',')));
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' }));
+        link.download = `scm_log_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+    }
+
+    async function initializePage() {
+        // Fetch Exchange Rates
+        await fetch('https://api.exchangerate-api.com/v4/latest/USD')
+            .then(res => res.json())
+            .then(data => { data.rates.USD = 1.0; exchangeRates = data.rates; })
+            .catch(err => { console.error("Rates error:", err); document.querySelectorAll('.sizer-card').forEach(c => c.innerHTML = `<h2 style="color: #ff4d4d;">Rates Error</h2><p>Check internet connection.</p>`); });
+        
+        calculatorH4D = new TradeCalculator('#h4-d-calculator');
+        calculatorDW = new TradeCalculator('#d-w-calculator');
+        
+        ocrFileInput.addEventListener('change', (e) => processImage(e.target.files[0]));
+        resetButton.addEventListener('click', resetApp);
+        setupCopyButtons();
+        
+        document.getElementById('manual-entry-button').addEventListener('click', manualLogTrade);
+        document.getElementById('export-csv-button').addEventListener('click', exportToCsv);
+        document.getElementById('clear-log-button').addEventListener('click', () => { if(confirm('Delete ALL logs?')) { localStorage.removeItem(TRADE_LOG_KEY); sortAndRender(); } });
+        document.getElementById('sort-trades').addEventListener('change', sortAndRender);
+        sortAndRender();
+    }
+
+    document.addEventListener('DOMContentLoaded', initializePage);
+</script>
+
+</body>
+</html>
