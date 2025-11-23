@@ -478,8 +478,8 @@
             Ensure 'pair' is one of these: ${currencyPairs.join(', ')}.
             `;
 
-            // Use 'latest' version to ensure compatibility
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+            // Use the standard stable model name
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
             const response = await fetch(url, {
                 method: 'POST',
