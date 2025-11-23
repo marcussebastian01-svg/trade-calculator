@@ -159,7 +159,7 @@
     <div class="header">
         <div class="header-title-group">
             <img src="logo.png" alt="Logo" class="header-logo" onerror="this.style.display='none'">
-            <h1><span class="branding">Trade Calculator</span> & Sizer (v2)</h1>
+            <h1 class="main-title"><span class="branding">Trade Calculator</span> & Sizer (v3)</h1>
         </div>
         <div class="nav-group">
             <button id="settings-btn" class="settings-btn">API Settings</button>
@@ -478,8 +478,8 @@
             Ensure 'pair' is one of these: ${currencyPairs.join(', ')}.
             `;
 
-            // Use the standard stable model name
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            // Using the Specific Version Number to prevent 404s
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=${apiKey}`;
 
             const response = await fetch(url, {
                 method: 'POST',
