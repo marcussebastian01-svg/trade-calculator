@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SCM - Calculators & Sizers (Gemini AI)</title>
+    <title>SCM - Calculators & Sizers (v4)</title>
     <style>
         :root { font-size: 15px; --gold: #d4a373; --dark: #1a1a1a; --darker: #111; --card-bg: #2c2c2c; --text: #e0e0e0; }
         body {
@@ -159,7 +159,7 @@
     <div class="header">
         <div class="header-title-group">
             <img src="logo.png" alt="Logo" class="header-logo" onerror="this.style.display='none'">
-            <h1 class="main-title"><span class="branding">Trade Calculator</span> & Sizer (v3)</h1>
+            <h1 class="main-title"><span class="branding">Trade Calculator</span> & Sizer (v4)</h1>
         </div>
         <div class="nav-group">
             <button id="settings-btn" class="settings-btn">API Settings</button>
@@ -450,7 +450,7 @@
         });
     }
 
-    // --- UPDATED GEMINI FUNCTION ---
+    // --- UPDATED GEMINI FUNCTION WITH FALLBACKS ---
     async function processImage(file) {
         const apiKey = localStorage.getItem(GEMINI_STORAGE_KEY);
         if (!apiKey) {
@@ -460,71 +460,89 @@
 
         if (!file) return;
 
-        try {
-            document.querySelector('.calculators-wrapper').style.display = 'flex';
-            ocrStatus.textContent = 'Preparing image for Gemini AI...';
-            
-            const imageBase64 = await fileToGenerativePart(file);
-            
-            ocrStatus.textContent = 'Sending to Google AI...';
+        // Fallback Models List
+        const modelsToTry = [
+            'gemini-1.5-flash',
+            'gemini-1.5-pro',
+            'gemini-1.0-pro-vision-latest'
+        ];
 
-            const prompt = `
-            Analyze this trading chart image. Return a JSON object (and nothing else) with these fields:
-            - pair: The 6-letter currency pair (e.g., AUDUSD, EURJPY). Look at corners or watermarks.
-            - timeframe: The timeframe (e.g., '4h', 'Daily', 'Weekly').
-            - entry: The numerical entry price.
-            - stop: The numerical stop loss price.
-            
-            Ensure 'pair' is one of these: ${currencyPairs.join(', ')}.
-            `;
+        document.querySelector('.calculators-wrapper').style.display = 'flex';
+        ocrStatus.textContent = 'Preparing image for Gemini AI...';
+        
+        const imageBase64 = await fileToGenerativePart(file);
+        
+        const prompt = `
+        Analyze this trading chart image. Return a JSON object (and nothing else) with these fields:
+        - pair: The 6-letter currency pair (e.g., AUDUSD, EURJPY). Look at corners or watermarks.
+        - timeframe: The timeframe (e.g., '4h', 'Daily', 'Weekly').
+        - entry: The numerical entry price.
+        - stop: The numerical stop loss price.
+        
+        Ensure 'pair' is one of these: ${currencyPairs.join(', ')}.
+        `;
 
-            // Using the Specific Version Number to prevent 404s
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent?key=${apiKey}`;
+        const requestBody = JSON.stringify({
+            contents: [{
+                parts: [
+                    { text: prompt },
+                    { 
+                        inline_data: { 
+                            mime_type: file.type || 'image/jpeg', 
+                            data: imageBase64 
+                        } 
+                    }
+                ]
+            }]
+        });
 
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: prompt },
-                            { 
-                                inline_data: { 
-                                    // Default to image/jpeg if type is missing (common browser bug)
-                                    mime_type: file.type || 'image/jpeg', 
-                                    data: imageBase64 
-                                } 
-                            }
-                        ]
-                    }]
-                })
-            });
+        // Try each model until one works
+        for (let i = 0; i < modelsToTry.length; i++) {
+            const modelName = modelsToTry[i];
+            ocrStatus.textContent = `Trying AI Model: ${modelName}...`;
 
-            if (!response.ok) {
-                // detailed error logging
-                const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
-                throw new Error(`Google Error (${response.status}): ${errorData.error?.message || response.statusText}`);
+            try {
+                // Use 'v1beta' for newer models, 'v1' sometimes helps for older
+                const apiVersion = modelName.includes('1.5') ? 'v1beta' : 'v1beta';
+                const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${modelName}:generateContent?key=${apiKey}`;
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: requestBody
+                });
+
+                if (!response.ok) {
+                    if (response.status === 404 && i < modelsToTry.length - 1) {
+                        console.warn(`${modelName} returned 404, trying next model...`);
+                        continue; // Try next model
+                    }
+                    // If it's not a 404 (e.g., Key Invalid) or it's the last model, throw error
+                    const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
+                    throw new Error(`Google Error (${response.status}): ${errorData.error?.message || response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (!data.candidates || data.candidates.length === 0) {
+                     throw new Error("AI returned no results. Blocked by safety?");
+                }
+
+                const textResponse = data.candidates[0].content.parts[0].text;
+                const jsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+                const result = JSON.parse(jsonString);
+
+                applyAiResults(result);
+                ocrStatus.innerHTML = `<span style="color:#50c878">Success using ${modelName}</span>`;
+                return; // Exit function on success
+
+            } catch (error) {
+                console.error(`Error with ${modelName}:`, error);
+                if (i === modelsToTry.length - 1) {
+                    // If all failed, show error
+                    ocrStatus.innerHTML = `<strong style="color:#ff4d4d">All Models Failed: ${error.message}</strong>`;
+                }
             }
-
-            const data = await response.json();
-            
-            // Safety check: Did AI return a valid candidate?
-            if (!data.candidates || data.candidates.length === 0) {
-                 throw new Error("AI returned no results. The image might be blocked by safety filters.");
-            }
-
-            const textResponse = data.candidates[0].content.parts[0].text;
-            
-            // Clean JSON (remove markdown backticks if present)
-            const jsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-            const result = JSON.parse(jsonString);
-
-            applyAiResults(result);
-
-        } catch (error) {
-            console.error("AI Error:", error);
-            // Display the ACTUAL error message on screen
-            ocrStatus.innerHTML = `<strong style="color:#ff4d4d">${error.message}</strong>`;
         }
     }
 
@@ -571,7 +589,7 @@
             statusParts.push(`Stop: <strong style="color: #50c878;">${data.stop}</strong>`);
         }
 
-        ocrStatus.innerHTML = statusParts.join(' | ');
+        ocrStatus.innerHTML += " | " + statusParts.join(' | ');
         activeCalc.performCalculations();
     }
 
